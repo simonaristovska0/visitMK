@@ -1,0 +1,150 @@
+@import "mapbox-gl/dist/mapbox-gl.css";
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Category accents */
+  --color-cat-outdoors: var(--cat-outdoors);
+  --color-cat-food: var(--cat-food);
+  --color-cat-cafe: var(--cat-cafe);
+  --color-cat-shopping: var(--cat-shopping);
+  --color-cat-culture: var(--cat-culture);
+  --color-cat-landmark: var(--cat-landmark);
+
+  /* Map surfaces */
+  --color-map-bg: var(--map-bg);
+  --color-map-land: var(--map-land);
+  --color-map-water: var(--map-water);
+  --color-map-road: var(--map-road);
+  --color-route: var(--route);
+
+  --font-serif: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* Warm editorial palette — cream paper, terracotta primary, deep olive ink */
+  --background: oklch(0.975 0.012 80);          /* warm cream */
+  --foreground: oklch(0.24 0.025 60);           /* deep ink brown */
+
+  --card: oklch(0.99 0.008 85);
+  --card-foreground: oklch(0.24 0.025 60);
+  --popover: oklch(0.99 0.008 85);
+  --popover-foreground: oklch(0.24 0.025 60);
+
+  --primary: oklch(0.58 0.16 38);               /* terracotta */
+  --primary-foreground: oklch(0.98 0.008 85);
+
+  --secondary: oklch(0.93 0.025 75);            /* soft sand */
+  --secondary-foreground: oklch(0.28 0.03 60);
+
+  --muted: oklch(0.94 0.018 80);
+  --muted-foreground: oklch(0.48 0.025 65);
+
+  --accent: oklch(0.55 0.09 155);               /* olive green */
+  --accent-foreground: oklch(0.98 0.008 85);
+
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.98 0.008 85);
+
+  --border: oklch(0.88 0.02 75);
+  --input: oklch(0.9 0.018 75);
+  --ring: oklch(0.58 0.16 38);
+
+  /* Category accents */
+  --cat-outdoors: oklch(0.58 0.12 155);         /* olive/forest */
+  --cat-food: oklch(0.62 0.18 35);              /* warm rust */
+  --cat-cafe: oklch(0.58 0.13 55);              /* coffee brown */
+  --cat-shopping: oklch(0.62 0.13 295);         /* dusty plum */
+  --cat-culture: oklch(0.6 0.13 230);           /* deep aegean */
+  --cat-landmark: oklch(0.65 0.15 70);          /* ochre */
+
+  /* Stylized map tokens */
+  --map-bg: oklch(0.95 0.018 85);
+  --map-land: oklch(0.92 0.022 90);
+  --map-water: oklch(0.84 0.04 220);
+  --map-road: oklch(0.86 0.015 80);
+  --route: oklch(0.58 0.16 38);
+}
+
+.dark {
+  --background: oklch(0.18 0.02 60);
+  --foreground: oklch(0.96 0.012 80);
+  --card: oklch(0.22 0.02 60);
+  --card-foreground: oklch(0.96 0.012 80);
+  --popover: oklch(0.22 0.02 60);
+  --popover-foreground: oklch(0.96 0.012 80);
+  --primary: oklch(0.68 0.16 40);
+  --primary-foreground: oklch(0.18 0.02 60);
+  --secondary: oklch(0.28 0.025 60);
+  --secondary-foreground: oklch(0.96 0.012 80);
+  --muted: oklch(0.26 0.02 60);
+  --muted-foreground: oklch(0.7 0.02 70);
+  --accent: oklch(0.62 0.1 155);
+  --accent-foreground: oklch(0.18 0.02 60);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.68 0.16 40);
+  --map-bg: oklch(0.22 0.02 60);
+  --map-land: oklch(0.26 0.02 60);
+  --map-water: oklch(0.3 0.04 220);
+  --map-road: oklch(0.32 0.015 70);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body { height: 100%; }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .font-serif { font-family: var(--font-serif); letter-spacing: -0.01em; }
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
