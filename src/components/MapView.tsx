@@ -195,9 +195,14 @@ export function MapView({
     let cancelled = false;
 
     const orderedCoords: [number, number][] = routeIds
-      .map((id) => pins.find((p) => p.landmark.id === id))
-      .filter(Boolean)
-      .map((p) => [p!.landmark.coordinates.lng, p!.landmark.coordinates.lat]);
+      .map((id): [number, number] | null => {
+        if (id === "user_location" && userLocation) {
+          return [userLocation.lng, userLocation.lat];
+        }
+        const p = pins.find((p) => p.landmark.id === id);
+        return p ? [p.landmark.coordinates.lng, p.landmark.coordinates.lat] : null;
+      })
+      .filter((c): c is [number, number] => c !== null);
 
     if (orderedCoords.length < 2) return;
 

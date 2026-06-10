@@ -7,6 +7,7 @@ const WaypointSchema = z.object({
   id: z.string(),
   coordinates: CoordinatesSchema,
   category: z.enum(["outdoors", "food", "cafe", "shopping", "culture", "landmark"]),
+  visitDurationMinutes: z.number().optional(),
 });
 
 /** Build an optimised itinerary via Mapbox Matrix + Directions APIs. */

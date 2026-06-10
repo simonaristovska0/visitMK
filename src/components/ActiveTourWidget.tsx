@@ -30,6 +30,7 @@ import {
   Loader2,
   Bookmark,
   BookmarkCheck,
+  MapPin,
 } from "lucide-react";
 import type { Itinerary, Landmark, TravelMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,28 @@ function fmt(mins: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+// ── Origin row (My Location, not sortable) ───────────────────────────────────
+
+function OriginRow() {
+  return (
+    <li>
+      <div className="flex items-center gap-2.5 rounded-xl px-2 py-1.5">
+        <span className="w-4 shrink-0" />
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-sky-500 text-white">
+          <MapPin className="h-3.5 w-3.5" />
+        </span>
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-100 dark:bg-sky-900/30">
+          <MapPin className="h-5 w-5 text-sky-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium leading-tight">My Location</p>
+          <p className="text-[11px] text-muted-foreground">Starting point</p>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 // ── Sortable stop row ─────────────────────────────────────────────────────────
 
 function SortableStopRow({
@@ -51,6 +74,7 @@ function SortableStopRow({
   visitDurationMinutes,
   travelLegBefore,
   isDirty,
+  forceShowLeg,
   onClick,
 }: {
   lm: Landmark;
@@ -58,6 +82,7 @@ function SortableStopRow({
   visitDurationMinutes: number;
   travelLegBefore?: { durationMinutes: number; distanceKm: number; mode: TravelMode };
   isDirty: boolean;
+  forceShowLeg?: boolean;
   onClick: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lm.id });
@@ -68,7 +93,7 @@ function SortableStopRow({
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.45 : 1 }}
     >
       {/* Travel leg divider */}
-      {index > 0 && (
+      {(index > 0 || forceShowLeg) && (
         <div className="flex items-center gap-2 py-1.5 px-2">
           <span className="h-px flex-1 bg-border/60" />
           {isDirty ? (
@@ -185,9 +210,13 @@ export function ActiveTourWidget({
     const { active, over } = event;
     if (over && active.id !== over.id) {
       setLocalStops((prev) => {
-        const oldIdx = prev.findIndex((l) => l.id === active.id);
-        const newIdx = prev.findIndex((l) => l.id === over.id);
-        return arrayMove(prev, oldIdx, newIdx);
+        // Keep user_location pinned at position 0; only reorder real stops
+        const hasOrigin = prev[0]?.id === "user_location";
+        const origin = hasOrigin ? [prev[0]] : [];
+        const reals = hasOrigin ? prev.slice(1) : prev;
+        const oldIdx = reals.findIndex((l) => l.id === active.id);
+        const newIdx = reals.findIndex((l) => l.id === over.id);
+        return [...origin, ...arrayMove(reals, oldIdx, newIdx)];
       });
       setIsDirty(true);
     }
@@ -208,6 +237,9 @@ export function ActiveTourWidget({
 
   // ── Collapsed pill ────────────────────────────────────────────────────────
 
+  const originStop = localStops[0]?.id === "user_location" ? localStops[0] : null;
+  const realStops = originStop ? localStops.slice(1) : localStops;
+
   if (!expanded) {
     return (
       <div className="flex items-center gap-3 rounded-2xl bg-card/95 backdrop-blur border border-border shadow-lg px-4 py-3">
@@ -215,7 +247,7 @@ export function ActiveTourWidget({
         <div className="flex-1 min-w-0">
           <p className="truncate text-sm font-semibold">{itinerary.wish || "Active tour"}</p>
           <p className="text-xs text-muted-foreground">
-            {localStops.length} stops · {fmt(itinerary.totalDurationMinutes)} · {itinerary.totalDistanceKm.toFixed(1)} km
+            {realStops.length} stops · {fmt(itinerary.totalDurationMinutes)} · {itinerary.totalDistanceKm.toFixed(1)} km
           </p>
         </div>
         <button
@@ -274,7 +306,7 @@ export function ActiveTourWidget({
             <span>·</span>
             <span>{itinerary.totalDistanceKm.toFixed(1)} km</span>
             <span>·</span>
-            <span>{localStops.length} stops</span>
+            <span>{realStops.length} stops</span>
           </div>
           <div className="text-[11px] text-muted-foreground/70 mt-0.5">
             {fmt(totalVisitMinutes)} at stops · {fmt(totalTravelMinutes)} travel
@@ -322,10 +354,13 @@ export function ActiveTourWidget({
       {/* Scrollable stop list */}
       <div className="overflow-y-auto flex-1 px-3 py-2">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={localStops.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-            <ul>
-              {localStops.map((lm, i) => {
-                // Find the original travel leg for this stop position (only valid when not dirty)
+          <ul>
+            {/* My Location origin (fixed, not sortable) */}
+            {originStop && <OriginRow />}
+
+            {/* Real stops — sortable, numbered 1, 2, 3… */}
+            <SortableContext items={realStops.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+              {realStops.map((lm, i) => {
                 const originalStop = itinerary.stops.find((s) => s.landmarkId === lm.id);
                 const leg = !isDirty ? originalStop?.travelFromPrevious : undefined;
                 return (
@@ -336,12 +371,13 @@ export function ActiveTourWidget({
                     visitDurationMinutes={originalStop?.durationMinutes ?? 30}
                     travelLegBefore={leg}
                     isDirty={isDirty && i > 0}
+                    forceShowLeg={i === 0 && !!originStop}
                     onClick={(id) => onStopClick?.(id)}
                   />
                 );
               })}
-            </ul>
-          </SortableContext>
+            </SortableContext>
+          </ul>
         </DndContext>
       </div>
 

@@ -748,32 +748,42 @@ interface BuildRouteArgs {
     place_id: string;
     coordinates: { lat: number; lng: number };
     category: string;
-    visit_duration_minutes?: number; // custom stay time; omit to use category default
+    visit_duration_minutes?: number;
   }>;
   travel_mode: "walking" | "driving";
   optimize_order: boolean;
   wish?: string;
+  start_from_user_location?: boolean;
 }
 
 async function execBuildRoute(
   args: BuildRouteArgs,
   mapboxToken: string,
   knownLandmarks: Landmark[],
+  userLocation: Coordinates | null,
 ): Promise<MCPToolResult> {
   if (args.waypoints.length < 2) {
     return { llmContent: JSON.stringify({ error: "Need at least 2 waypoints to build a route" }) };
   }
 
-  // Normalise IDs: always ensure the "places_" prefix so landmark lookup works.
-  // The LLM sometimes strips the prefix when it reads IDs from get_place_details responses.
   const normaliseId = (id: string) => (id.startsWith("places_") ? id : `places_${id}`);
 
-  const waypoints = args.waypoints.map((w) => ({
+  let waypoints: import("../api/itinerary.server").ItineraryWaypoint[] = args.waypoints.map((w) => ({
     id: normaliseId(w.place_id),
     coordinates: w.coordinates,
     category: (w.category as Category) ?? "landmark",
     ...(w.visit_duration_minutes != null ? { visitDurationMinutes: w.visit_duration_minutes } : {}),
   }));
+
+  // Prepend the user's current GPS position as a zero-duration origin waypoint.
+  // greedyOrder always starts from index 0, so it stays first in the route.
+  // It has no matching landmark so it won't appear as a named stop in the widget.
+  if (args.start_from_user_location && userLocation) {
+    waypoints = [
+      { id: "user_location", coordinates: userLocation, category: "landmark", visitDurationMinutes: 0 },
+      ...waypoints,
+    ];
+  }
 
   const itinerary = await buildItinerary(
     waypoints,
@@ -783,11 +793,30 @@ async function execBuildRoute(
   );
 
   // Match each stop back to the full Landmark object so the widget can show thumbnails.
-  // Some stops may not be in knownLandmarks if the LLM re-used a place from a
-  // previous session — those will be silently filtered out (filter Boolean).
-  const stopLandmarks = itinerary.stops
+  // Prepend a synthetic "My Location" landmark for the user_location origin waypoint so
+  // the widget renders it with a pin icon instead of silently filtering it out.
+  const stopLandmarks: Landmark[] = [];
+  if (itinerary.stops[0]?.landmarkId === "user_location" && userLocation) {
+    stopLandmarks.push({
+      id: "user_location",
+      name: "My Location",
+      category: "landmark",
+      coordinates: userLocation,
+      rating: 0,
+      reviewCount: 0,
+      priceMKD: 0,
+      openingHours: { open: "", close: "", openNow: true },
+      walkTimeMinutes: 0,
+      heroImage: "",
+      history: "",
+      practicalInfo: "",
+    });
+  }
+  itinerary.stops
+    .filter((s) => s.landmarkId !== "user_location")
     .map((s) => knownLandmarks.find((l) => l.id === s.landmarkId))
-    .filter((l): l is Landmark => l != null);
+    .filter((l): l is Landmark => l != null)
+    .forEach((l) => stopLandmarks.push(l));
 
   return {
     llmContent: JSON.stringify({
@@ -1108,6 +1137,10 @@ export const MCP_TOOLS: GroqTool[] = [
             type: "string",
             description: "One-line tour description shown as the route title, e.g. 'Morning tour of the Old Bazaar'",
           },
+          start_from_user_location: {
+            type: "boolean",
+            description: "true = the route starts from the user's current GPS position before the first stop. Set this when the user answered 'current location' to the starting point question.",
+          },
         },
         required: ["waypoints", "travel_mode"],
       },
@@ -1186,7 +1219,7 @@ export async function executeMCPTool(
       case "get_place_details":
         return await execGetPlaceDetails(args as unknown as GetDetailsArgs, apiKey);
       case "build_route":
-        return await execBuildRoute(args as unknown as BuildRouteArgs, mapboxToken, knownLandmarks);
+        return await execBuildRoute(args as unknown as BuildRouteArgs, mapboxToken, knownLandmarks, userLocation);
       case "find_known_area":
         return await execFindArea(args as unknown as FindAreaArgs, apiKey);
       case "get_map_places":

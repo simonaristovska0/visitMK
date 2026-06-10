@@ -153,12 +153,14 @@ export function UnifiedView() {
 
   // Pins to show on the map (visible group pins + route pins)
   const allPins = useMemo(() => {
-    // Numbered route pins — these take priority over any group pin for the same landmark
+    // Numbered route pins — exclude the user_location origin (shown as GPS dot already)
     const routePins = route
-      ? routeLandmarks.map((lm, i) => ({
-          landmark: lm,
-          order: i + 1,
-        }))
+      ? routeLandmarks
+          .filter((lm) => lm.id !== "user_location")
+          .map((lm, i) => ({
+            landmark: lm,
+            order: i + 1,
+          }))
       : [];
     const routeIds = new Set(routePins.map((p) => p.landmark.id));
     // Group pins, excluding any landmark already shown as a numbered route stop
@@ -203,11 +205,22 @@ export function UnifiedView() {
           id: lm.id,
           coordinates: lm.coordinates,
           category: lm.category,
+          // user_location is a zero-duration origin waypoint, not a place to visit
+          ...(lm.id === "user_location" ? { visitDurationMinutes: 0 } : {}),
         }));
         const result = await buildItinerary({
           data: { waypoints, travelMode: mode, wish: route?.wish ?? "Custom tour" },
         });
-        setRoute(result.itinerary, orderedLandmarks);
+        // Reorder landmarks to match the server's stop order so map pins and
+        // the route line are drawn in the same sequence.
+        const byId: Record<string, Landmark> = {};
+        for (const lm of orderedLandmarks) byId[lm.id] = lm;
+        const serverOrderedLandmarks = result.itinerary.stops
+          .map((s) => byId[s.landmarkId])
+          .filter((lm): lm is Landmark => lm != null);
+        setRoute(result.itinerary, serverOrderedLandmarks);
+      } catch (err) {
+        console.error("[recalculate] buildItinerary failed:", err);
       } finally {
         setIsRecalculating(false);
       }
