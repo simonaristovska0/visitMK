@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Heart, Star, Footprints, X, Navigation, Bookmark, Clock, Banknote, MapPin, Phone, Globe } from "lucide-react";
-import type { Landmark } from "@/lib/types";
+import { Heart, Star, Footprints, X, Navigation, Bookmark, Clock, Banknote, MapPin, Phone, Globe, Loader2 } from "lucide-react";
+import type { Landmark, PlaceReview } from "@/lib/types";
 import { CategoryBadge } from "./CategoryBadge";
 import { AskAIChat } from "./AskAIChat";
 import { AuthModal } from "./AuthModal";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { fetchPlaceReviews } from "@/lib/api/reviews.functions";
 
 type Tab = "reviews" | "practical" | "ask";
 
@@ -23,10 +24,25 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
   const [saved, setSaved] = useState(false);
   const [favorite, setFavorite] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [liveReviews, setLiveReviews] = useState<PlaceReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   useEffect(() => {
     setTab("reviews");
     setSaved(false);
+    setLiveReviews([]);
+  }, [landmark?.id]);
+
+  // Fetch fresh reviews from Google Places API whenever a landmark is opened
+  useEffect(() => {
+    if (!landmark?.id || landmark.id === "user_location") return;
+    let cancelled = false;
+    setReviewsLoading(true);
+    fetchPlaceReviews({ data: { placeId: landmark.id } })
+      .then(({ reviews }) => { if (!cancelled) setLiveReviews(reviews); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setReviewsLoading(false); });
+    return () => { cancelled = true; };
   }, [landmark?.id]);
 
   // Check if this landmark is already saved when user/landmark changes
@@ -194,12 +210,7 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
         <div className="flex shrink-0 border-b border-border px-3 md:px-5">
           {(
             [
-              {
-                id: "reviews" as const,
-                label: landmark.category === "food" || landmark.category === "cafe"
-                  ? "Reviews"
-                  : "History",
-              },
+              { id: "reviews" as const, label: "Reviews" },
               { id: "practical" as const, label: "Practical" },
               { id: "ask" as const, label: "Ask AI" },
             ]
@@ -229,35 +240,11 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
             : "overflow-y-auto px-5 py-5 md:px-7"
         )}>
           {tab === "reviews" && (
-            <div className="space-y-4">
-              {/* Food/café: show Google reviews; others: show history text */}
-              {(landmark.category === "food" || landmark.category === "cafe") && landmark.reviews?.length ? (
-                <div className="space-y-3">
-                  {landmark.reviewCount > landmark.reviews.length && (
-                    <p className="text-xs text-muted-foreground">
-                      Showing {landmark.reviews.length} of {landmark.reviewCount.toLocaleString()} Google reviews
-                    </p>
-                  )}
-                  {landmark.reviews.map((r, i) => (
-                    <div key={i} className="rounded-2xl border border-border bg-background/60 p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">{r.author}</span>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <StarRow rating={r.rating} />
-                          <span className="ml-1">{r.relativeTime}</span>
-                        </div>
-                      </div>
-                      <p className="mt-2 text-sm leading-relaxed text-foreground/80">{r.text}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {landmark.history ? (
-                    <p className="text-[15px] leading-relaxed text-foreground/85">{landmark.history}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No description available yet.</p>
-                  )}
+            <div className="space-y-5">
+              {/* History / description — shown for non-food places as context */}
+              {landmark.category !== "food" && landmark.category !== "cafe" && landmark.history && (
+                <div className="space-y-2">
+                  <p className="text-[15px] leading-relaxed text-foreground/85">{landmark.history}</p>
                   {landmark.wikipediaSummary && (
                     <p className="text-sm text-muted-foreground">
                       <span className="eyebrow mr-2 inline">Wikipedia</span>
@@ -266,6 +253,53 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
                   )}
                 </div>
               )}
+
+              {/* Live Google reviews */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Google reviews
+                  </p>
+                  {reviewsLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                </div>
+
+                {reviewsLoading && liveReviews.length === 0 ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="rounded-2xl border border-border bg-background/60 p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+                          <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+                        </div>
+                        <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                        <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+                      </div>
+                    ))}
+                  </div>
+                ) : liveReviews.length > 0 ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {liveReviews.length} of {landmark.reviewCount.toLocaleString()} Google reviews
+                    </p>
+                    {liveReviews.map((r, i) => (
+                      <div key={i} className="rounded-2xl border border-border bg-background/60 p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold">{r.author}</span>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <StarRow rating={r.rating} />
+                            <span>{r.relativeTime}</span>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-foreground/80">{r.text}</p>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  !reviewsLoading && (
+                    <p className="text-sm text-muted-foreground">No reviews available for this place.</p>
+                  )
+                )}
+              </div>
             </div>
           )}
 
