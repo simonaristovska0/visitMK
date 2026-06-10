@@ -17,6 +17,7 @@ export interface MapPin {
   landmark: Landmark;
   order?: number;
   dim?: boolean;
+  color?: string;   // overrides the category color (used by PinGroup system)
 }
 
 interface MapViewProps {
@@ -98,7 +99,7 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mglRef = useRef<MapboxGL | null>(null);
-  const markersRef = useRef<Map<string, { marker: mapboxgl.Marker; el: HTMLButtonElement }>>(new Map());
+  const markersRef = useRef<Map<string, { marker: mapboxgl.Marker; el: HTMLButtonElement; order?: number; color: string }>>(new Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const savedViewRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -146,10 +147,16 @@ export function MapView({
     for (const id of markersRef.current.keys()) {
       if (!newIds.has(id)) { markersRef.current.get(id)!.marker.remove(); markersRef.current.delete(id); }
     }
-    for (const { landmark, order, dim } of pins) {
-      const color = categoryColorVar[landmark.category];
+    for (const { landmark, order, dim, color: pinColor } of pins) {
+      const color = pinColor ?? categoryColorVar[landmark.category];
       const existing = markersRef.current.get(landmark.id);
-      if (existing) {
+      // If order or color changed (e.g. group pin → numbered route pin), replace the marker
+      const needsRebuild = existing && (existing.order !== order || existing.color !== color);
+      if (needsRebuild) {
+        existing.marker.remove();
+        markersRef.current.delete(landmark.id);
+      }
+      if (existing && !needsRebuild) {
         existing.el.style.opacity = dim ? "0.5" : "1";
       } else {
         const el = makePinEl(color, order, dim);
@@ -157,7 +164,7 @@ export function MapView({
         const marker = new mgl.Marker({ element: el, anchor: "bottom" })
           .setLngLat([landmark.coordinates.lng, landmark.coordinates.lat])
           .addTo(map);
-        markersRef.current.set(landmark.id, { marker, el });
+        markersRef.current.set(landmark.id, { marker, el, order, color });
       }
     }
   }, [mapReady, pins]);

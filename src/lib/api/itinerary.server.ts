@@ -6,6 +6,7 @@ export interface ItineraryWaypoint {
   id: string;
   coordinates: Coordinates;
   category: Category;
+  visitDurationMinutes?: number; // overrides STOP_DURATION[category] when provided
 }
 
 interface MatrixResponse {
@@ -190,7 +191,7 @@ export async function buildItinerary(
     return {
       landmarkId: wp.id,
       order: i + 1,
-      durationMinutes: STOP_DURATION[wp.category],
+      durationMinutes: wp.visitDurationMinutes ?? STOP_DURATION[wp.category],
       ...(travelFromPrevious ? { travelFromPrevious } : {}),
     };
   });

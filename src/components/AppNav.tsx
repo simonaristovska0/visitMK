@@ -1,10 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Compass, Map, Bookmark, User } from "lucide-react";
+import { Compass, Bookmark, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { to: "/explore", label: "Explore", icon: Compass },
-  { to: "/", label: "Plan", icon: Map },
+  { to: "/", label: "Explore", icon: Compass },
   { to: "/saved", label: "Saved", icon: Bookmark },
   { to: "/profile", label: "Profile", icon: User },
 ] as const;
@@ -18,7 +17,7 @@ export function AppNav() {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <ul className="grid grid-cols-4">
+        <ul className="grid grid-cols-3">
           {items.map(({ to, label, icon: Icon }) => {
             const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
             return (

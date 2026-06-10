@@ -12,4 +12,12 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // react-markdown and remark-gfm are pure ESM packages. Without this, Vite's SSR
+    // bundler tries to require() them and fails. noExternal forces Vite to bundle
+    // them (and their transitive deps) rather than treating them as Node externals.
+    ssr: {
+      noExternal: ["react-markdown", "remark-gfm"],
+    },
+  },
 });

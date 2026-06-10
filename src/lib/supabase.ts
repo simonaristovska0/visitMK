@@ -16,3 +16,12 @@ export type SavedLandmarkRow = {
   landmark_data: import("./types").Landmark;
   saved_at: string;
 };
+
+export type SavedTourRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  itinerary: import("./types").Itinerary;
+  landmarks: import("./types").Landmark[];
+  saved_at: string;
+};

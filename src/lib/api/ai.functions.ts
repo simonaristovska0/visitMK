@@ -23,8 +23,59 @@ export const sendAIMessage = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { generateAIResponse } = await import("./ai.server");
-    const apiKey = process.env.GROQ_API_KEY ?? "";
-    if (!apiKey) throw new Error("GROQ_API_KEY is not configured in .env");
+    const apiKey = process.env.DEEPSEEK_API_KEY ?? "";
+    if (!apiKey) throw new Error("DEEPSEEK_API_KEY is not configured in .env");
     const response = await generateAIResponse(data.messages, data.landmark, apiKey);
     return { response };
+  });
+
+const CoordinatesSchema = z.object({ lat: z.number(), lng: z.number() });
+
+const ConvMsgSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+});
+
+const PersistedLandmarkSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+}).passthrough();
+
+const PersistedItinerarySchema = z.object({
+  id: z.string(),
+  wish: z.string(),
+  travelMode: z.enum(["walking", "driving"]),
+  totalDurationMinutes: z.number(),
+  totalDistanceKm: z.number(),
+  stops: z.array(
+    z.object({
+      landmarkId: z.string(),
+      order: z.number(),
+      durationMinutes: z.number(),
+    }).passthrough(),
+  ),
+}).passthrough();
+
+export const sendUnifiedChatMessage = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      conversationHistory: z.array(ConvMsgSchema).max(40),
+      userLocation: CoordinatesSchema.nullable().optional(),
+      persistedLandmarks: z.array(PersistedLandmarkSchema).optional(),
+      persistedItinerary: PersistedItinerarySchema.nullable().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { executeUnifiedChat } = await import("./ai.server");
+    const deepseekKey = process.env.DEEPSEEK_API_KEY ?? "";
+    if (!deepseekKey) throw new Error("DEEPSEEK_API_KEY is not configured in .env");
+    const mapboxToken = process.env.VITE_MAPBOX_TOKEN ?? "";
+    return executeUnifiedChat(
+      data.conversationHistory,
+      data.userLocation ?? null,
+      deepseekKey,
+      mapboxToken,
+      (data.persistedLandmarks ?? []) as unknown as import("../types").Landmark[],
+      (data.persistedItinerary ?? null) as unknown as import("../types").Itinerary | null,
+    );
   });
