@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Heart, Star, Footprints, X, Navigation, Bookmark, Clock, Banknote, MapPin, Phone, Globe, Loader2 } from "lucide-react";
+import { Heart, Star, Footprints, X, Bookmark, Clock, Banknote, MapPin, Phone, Globe, Loader2 } from "lucide-react";
 import type { Landmark, PlaceReview } from "@/lib/types";
 import { CategoryBadge } from "./CategoryBadge";
 import { AskAIChat } from "./AskAIChat";
@@ -356,19 +356,6 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
             aria-label={saved ? "Unsave" : "Save"}
           >
             <Bookmark className={cn("h-5 w-5", saved && "fill-primary text-primary")} />
-          </Button>
-          <Button
-            className="h-12 flex-1 rounded-full bg-primary text-base font-medium hover:opacity-90"
-            onClick={() => {
-              const { lat, lng } = landmark.coordinates;
-              window.open(
-                `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${encodeURIComponent(landmark.name)}`,
-                "_blank",
-              );
-            }}
-          >
-            <Navigation className="mr-2 h-4 w-4" />
-            Get directions
           </Button>
         </div>
       </aside>

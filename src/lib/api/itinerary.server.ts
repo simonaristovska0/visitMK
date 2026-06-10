@@ -141,20 +141,21 @@ export async function buildItinerary(
   travelMode: TravelMode,
   wish: string,
   token: string,
+  optimizeOrder = true,
 ): Promise<Itinerary> {
   if (waypoints.length === 0) throw new Error("No waypoints provided");
 
   const coords = waypoints.map((w) => w.coordinates);
 
   // ── Step 1: Matrix API → optimised order ────────────────────────────────
+  // Skip optimisation when the caller has already specified the desired order
+  // (e.g. the user manually reordered stops in the widget).
   let orderedIdx: number[];
-  const matrix = waypoints.length > 1 ? await fetchMatrix(coords, travelMode, token) : null;
-
-  if (matrix?.durations) {
-    orderedIdx = greedyOrder(matrix.durations);
-  } else {
-    // Fallback: keep input order (caller should sort by proximity)
+  if (!optimizeOrder) {
     orderedIdx = waypoints.map((_, i) => i);
+  } else {
+    const matrix = waypoints.length > 1 ? await fetchMatrix(coords, travelMode, token) : null;
+    orderedIdx = matrix?.durations ? greedyOrder(matrix.durations) : waypoints.map((_, i) => i);
   }
 
   const ordered = orderedIdx.map((i) => waypoints[i]);

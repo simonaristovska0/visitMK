@@ -121,14 +121,22 @@ export function UnifiedView() {
   // If the user clicked "Load on map" from the saved tours page, restore it now
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem("vmk_load_tour");
-      if (raw) {
+      const tourRaw = sessionStorage.getItem("vmk_load_tour");
+      if (tourRaw) {
         sessionStorage.removeItem("vmk_load_tour");
-        const { itinerary, landmarks } = JSON.parse(raw) as {
+        const { itinerary, landmarks } = JSON.parse(tourRaw) as {
           itinerary: Itinerary;
           landmarks: Landmark[];
         };
         setRoute(itinerary, landmarks);
+      }
+
+      const placeRaw = sessionStorage.getItem("vmk_view_landmark");
+      if (placeRaw) {
+        sessionStorage.removeItem("vmk_view_landmark");
+        const lm = JSON.parse(placeRaw) as Landmark;
+        addGroup(`saved_${lm.id}`, lm.name, [lm]);
+        setSelectedId(lm.id);
       }
     } catch {}
   // Run once on mount only
@@ -208,17 +216,12 @@ export function UnifiedView() {
           // user_location is a zero-duration origin waypoint, not a place to visit
           ...(lm.id === "user_location" ? { visitDurationMinutes: 0 } : {}),
         }));
+        // optimizeOrder: false — the user has already chosen the stop sequence
+        // by dragging; we only need fresh travel legs, not a re-optimisation.
         const result = await buildItinerary({
-          data: { waypoints, travelMode: mode, wish: route?.wish ?? "Custom tour" },
+          data: { waypoints, travelMode: mode, wish: route?.wish ?? "Custom tour", optimizeOrder: false },
         });
-        // Reorder landmarks to match the server's stop order so map pins and
-        // the route line are drawn in the same sequence.
-        const byId: Record<string, Landmark> = {};
-        for (const lm of orderedLandmarks) byId[lm.id] = lm;
-        const serverOrderedLandmarks = result.itinerary.stops
-          .map((s) => byId[s.landmarkId])
-          .filter((lm): lm is Landmark => lm != null);
-        setRoute(result.itinerary, serverOrderedLandmarks);
+        setRoute(result.itinerary, orderedLandmarks);
       } catch (err) {
         console.error("[recalculate] buildItinerary failed:", err);
       } finally {
