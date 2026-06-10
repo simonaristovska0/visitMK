@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { Heart, Star, Footprints, X, Bookmark, Clock, Banknote, MapPin, Phone, Globe, Loader2 } from "lucide-react";
+import { Heart, Star, Footprints, X, Bookmark, Clock, Banknote, MapPin, Phone, Globe, Loader2, BookOpen, ExternalLink } from "lucide-react";
 import type { Landmark, PlaceReview } from "@/lib/types";
 import { CategoryBadge } from "./CategoryBadge";
-import { AskAIChat } from "./AskAIChat";
 import { AuthModal } from "./AuthModal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,8 +9,9 @@ import { formatPrice } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { fetchPlaceReviews } from "@/lib/api/reviews.functions";
+import { fetchLandmarkWikipedia, type WikipediaResult } from "@/lib/api/wikipedia.functions";
 
-type Tab = "reviews" | "practical" | "ask";
+type Tab = "reviews" | "practical" | "about";
 
 interface LandmarkDetailProps {
   landmark: Landmark | null;
@@ -26,11 +26,36 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
   const [authOpen, setAuthOpen] = useState(false);
   const [liveReviews, setLiveReviews] = useState<PlaceReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [wikiResult, setWikiResult] = useState<WikipediaResult | null>(null);
+  const [wikiLoading, setWikiLoading] = useState(false);
+
+  const isNonFood = landmark?.category !== "food" && landmark?.category !== "cafe";
 
   useEffect(() => {
     setTab("reviews");
     setSaved(false);
     setLiveReviews([]);
+    setWikiResult(null);
+  }, [landmark?.id]);
+
+  // Fetch Wikipedia article for non-food/cafe landmarks
+  useEffect(() => {
+    if (!landmark || !isNonFood || landmark.id === "user_location") return;
+    let cancelled = false;
+    setWikiLoading(true);
+    fetchLandmarkWikipedia({
+      data: {
+        lat: landmark.coordinates.lat,
+        lng: landmark.coordinates.lng,
+        wikidataId: landmark.wikidataId,
+        wikipediaArticle: landmark.wikipediaArticle,
+      },
+    })
+      .then((result) => { if (!cancelled) setWikiResult(result); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setWikiLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [landmark?.id]);
 
   // Fetch fresh reviews from Google Places API whenever a landmark is opened
@@ -212,7 +237,7 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
             [
               { id: "reviews" as const, label: "Reviews" },
               { id: "practical" as const, label: "Practical" },
-              { id: "ask" as const, label: "Ask AI" },
+              ...(isNonFood ? [{ id: "about" as const, label: "About" }] : []),
             ]
           ).map((t) => (
             <button
@@ -233,12 +258,7 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
         </div>
 
         {/* Content */}
-        <div className={cn(
-          "flex-1 min-h-0",
-          tab === "ask"
-            ? "flex flex-col overflow-hidden"
-            : "overflow-y-auto px-5 py-5 md:px-7"
-        )}>
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 md:px-7">
           {tab === "reviews" && (
             <div className="space-y-5">
               {/* History / description — shown for non-food places as context */}
@@ -340,7 +360,49 @@ export function LandmarkDetail({ landmark, onClose }: LandmarkDetailProps) {
             </div>
           )}
 
-          {tab === "ask" && <AskAIChat landmark={landmark} />}
+          {tab === "about" && (
+            <div className="space-y-5">
+              {wikiLoading && !wikiResult && (
+                <div className="space-y-3">
+                  <div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-5/6 animate-pulse rounded bg-muted" />
+                </div>
+              )}
+              {!wikiLoading && !wikiResult && (
+                <p className="text-sm text-muted-foreground">No Wikipedia article found for this place.</p>
+              )}
+              {wikiResult && (
+                <>
+                  {wikiResult.thumbnail && (
+                    <img
+                      src={wikiResult.thumbnail}
+                      alt={wikiResult.title}
+                      className="w-full rounded-2xl object-cover max-h-48"
+                    />
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Wikipedia</p>
+                    </div>
+                    <h3 className="mt-1.5 font-serif text-xl">{wikiResult.title}</h3>
+                    <p className="mt-2 text-[15px] leading-relaxed text-foreground/85">{wikiResult.extract}</p>
+                  </div>
+                  <a
+                    href={wikiResult.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                  >
+                    Read full article
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom action bar */}
