@@ -55,8 +55,7 @@ function ProfilePage() {
             <ul className="mt-10 divide-y divide-border rounded-2xl border border-border bg-card">
               {[
                 { icon: Languages, label: "Language", value: "English" },
-                { icon: Globe2, label: "Region", value: "Skopje, North Macedonia" },
-                { icon: Settings, label: "Preferences", value: "Walking · 7h days" },
+                { icon: Globe2, label: "Region", value: "Skopje, North Macedonia" }
               ].map(({ icon: Icon, label, value }) => (
                 <li key={label} className="flex items-center gap-4 px-5 py-4">
                   <Icon className="h-4 w-4 text-muted-foreground" />
